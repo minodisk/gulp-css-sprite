@@ -26,6 +26,8 @@
   "dependencies": {
     "cloneextend": "0.0.3",
     "gulp-util": "^3.0.0",
+    "lodash": "^2.4.1",
+    "spritesmith": "^0.19.2",
     "through2": "^0.5.1"
   },
   "devDependencies": {
