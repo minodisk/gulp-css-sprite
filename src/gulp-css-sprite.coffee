@@ -1,11 +1,8 @@
 through = require 'through2'
 { PluginError, File } = require 'gulp-util'
-# { PassThrough } = require 'stream'
 { cloneextend } = require 'cloneextend'
 { dirname, basename, extname, resolve, relative, join } = require 'path'
 { readdirSync } = require 'fs'
-# { createReadStream } = require 'fs'
-{ createHash } = require 'crypto'
 spritesmith = require 'spritesmith'
 { isNumber, isString } = require 'lodash'
 
