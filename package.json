@@ -1,6 +1,6 @@
 {
   "name": "gulp-css-sprite",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "CSS Sprite with spritesmith",
   "keywords": [
     "gulpplugin",
