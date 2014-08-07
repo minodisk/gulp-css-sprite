@@ -1,13 +1,9 @@
 through = require 'through2'
 { PluginError, File } = require 'gulp-util'
-# { PassThrough } = require 'stream'
-{ cloneextend } = require 'cloneextend'
-{ dirname, basename, extname, resolve, relative, join } = require 'path'
+{ dirname, basename, extname, relative, join } = require 'path'
 { readdirSync } = require 'fs'
-# { createReadStream } = require 'fs'
-{ createHash } = require 'crypto'
+{ isObject, isNumber, isString, clone, merge } = require 'lodash'
 spritesmith = require 'spritesmith'
-{ isNumber, isString } = require 'lodash'
 
 PLUGIN_NAME = 'gulp-css-cache-bust'
 
@@ -16,122 +12,116 @@ defOpts =
   srcBase: 'sprite'
   destBase: ''
   imageFormat: 'png'
-  # relativeBase: null
   withMixin: true
 
-propertyOrder = [ 'x', 'y', 'width', 'height', 'imageWidth', 'imageHeight', 'url']
-getPropertyIndex = (prop) -> 1 + propertyOrder.indexOf prop
-getOrderedProperties = (props) ->
-  for prop in propertyOrder
-    value = props[prop]
-    if isNumber value
-      value += 'px'
-    else if isString value
-      value = "'#{value}'"
-    value
+objectToSCSSMap = (obj) ->
+  map = []
+  for key, val of obj
+    if isObject val
+      val = objectToSCSSMap val
+    else if isNumber val
+      if val isnt 0
+        val = "#{val}px"
+    else if isString val
+      val = "'#{val}'"
+    map.push "#{key}: #{val}"
+  "(#{map.join ', '})"
 
 mixin = (cssFormat) ->
   switch cssFormat
     when 'scss'
       """
       @mixin sprite($group, $name) {
-        $id: '$' + $group + $name;
-        width: nth($id, #{getPropertyIndex 'width'});
-        height: nth($id, #{getPropertyIndex 'height'});
-        background: url('nth($id, #{getPropertyIndex 'url'})') no-repeat;
-        background-position: nth($id, #{getPropertyIndex 'x'}) nth($id, #{getPropertyIndex 'y'});
+        $group-data: map-get($sprite-map, $group);
+        $sprite-data: map-get($group-data, $name);
+        width: map-get($sprite-data, 'width');
+        height: map-get($sprite-data, 'height');
+        background: url(map-get($group-data, 'url')) no-repeat;
+        background-position: map-get($sprite-data, 'x') map-get($sprite-data, 'y');
       }
       @mixin sprite-retina($group, $name) {
-        $id: '$' + $group + $name;
-        width: nth($id, #{getPropertyIndex 'width'})/2;
-        height: nth($id, #{getPropertyIndex 'height'})/2;
-        background: url('nth($id, #{getPropertyIndex 'url'})') no-repeat;
-        background-position: nth($id, #{getPropertyIndex 'x'})/2 nth($id, #{getPropertyIndex 'y'})/2;
-        background-size: nth($id, #{getPropertyIndex 'imageWidth'})/2 nth($id, #{getPropertyIndex 'imageHeight'})/2;
+        $group-data: map-get($sprite-map, $group);
+        $sprite-data: map-get($group-data, $name);
+        width: map-get($sprite-data, 'width')/2;
+        height: map-get($sprite-data, 'height')/2;
+        background: url(map-get($group-data, 'url')) no-repeat;
+        background-position: map-get($sprite-data, 'x')/2 map-get($sprite-data, 'y')/2;
+        -webkit-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
+        -moz-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
+        -o-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
+        background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
       }
       """
     else
       ""
 
+getGroup = (filename) ->
+  dirname(filename).split('/').pop()
+
+getName = (filename) ->
+  basename filename, extname filename
+
 sprite = (opts = {}) ->
-  opts = cloneextend defOpts, opts
+  opts = merge clone(defOpts), opts
 
-  srcBases = []
+  files = []
+  spriteMap = {}
 
-  through.obj (file, enc, callback) ->
+  through
+    objectMode: true
+  , (file, enc, callback) ->
     if file.isNull()
       @push file
       callback()
       return
 
     if file.isBuffer()
-      srcBase = relative '', dirname file.path
-      if srcBase in srcBases
+      group = getGroup file.path
+      if spriteMap[group]
         callback()
         return
-      srcBases.push srcBase
+      spriteMap[group] = true
 
-      filenames = for filename in readdirSync srcBase
-        join srcBase, filename
+      srcParentDir = relative '', dirname file.path
+      srcImageFilenames = for srcImageFilename in readdirSync srcParentDir
+        join srcParentDir, srcImageFilename
 
       spritesmith
-        src: filenames
+        src: srcImageFilenames
       , (err, result) =>
+        throw new PluginError err if err?
+
         { coordinates, properties: { width: imageWidth, height: imageHeight }, image } = result
 
-        csses = for url, { x, y, width, height } of coordinates
-          name = basename url, extname url
-          url = dirname url
-          group = url.split('/').pop()
-          url += ".#{opts.imageFormat}"
-          url = relative opts.srcBase, url
+        relativeFilenameFromBase = relative opts.srcBase, "#{srcParentDir}.#{opts.imageFormat}"
+        imageFile = new File
+        imageFile.path = relativeFilenameFromBase
+        imageFile.contents = new Buffer image, 'binary'
+        @push imageFile
 
-          imageFile = new File
-          imageFile.path = url
-          imageFile.contents = new Buffer image, 'binary'
-          @push imageFile
-
-          #TODO support relative
-          # if opts.relativeBase?
-          #   basename pathFromProjectRoot
-          # else
-          url = "/#{url}"
-
-          x *= -1
-          y *= -1
-          properties = getOrderedProperties { x, y, width, height, imageWidth, imageHeight, url }
-
-          switch opts.cssFormat
-            when 'scss'
-              "$#{group}-#{name}: #{properties.join ' '};"
-            else
-              "" #TODO implement
-
-        if opts.withMixin
-          csses.push mixin opts.cssFormat
-
-        cssFile = new File
-        cssFile.path = "sprite.#{opts.cssFormat}"
-        cssFile.contents = new Buffer csses.join '\n'
-        @push cssFile
+        #TODO support relative
+        # if opts.relativeBase?
+        #   basename pathFromProjectRoot
+        # else
+        url = "/#{relativeFilenameFromBase}"
+        spriteMap[group] = { imageWidth, imageHeight, url }
+        for filename, { x, y, width, height } of coordinates
+          group = getGroup filename
+          name = getName filename
+          spriteMap[group][name] = { x: -x, y: -y, width, height }
 
         callback()
 
     throw new PluginError 'Stream is not supported' if file.isStream()
+  , (callback) ->
+    @push new File
+      path: "_sprite.#{opts.cssFormat}"
+      contents: new Buffer """
+      $sprite-map: #{objectToSCSSMap spriteMap};
+      #{mixin opts.cssFormat}
 
-sprite.mixin = (opts) ->
-
-  through.obj (file, enc, callback) ->
-    if file.isNull()
-      @push file
-      callback()
-      return
-
-    if file.isBuffer()
-      file.contents = new Buffer file.contents + '\n' + mixin opts.cssFormat
-      @push file
-      callback()
-
-    throw new PluginError 'Stream is not supported' if file.isStream()
+      """
+    @emit 'end'
+    callback()
 
 module.exports = sprite
