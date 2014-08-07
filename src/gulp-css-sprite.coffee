@@ -85,6 +85,7 @@ sprite = (opts = {}) ->
       srcParentDir = relative '', dirname file.path
       srcImageFilenames = for srcImageFilename in readdirSync srcParentDir
         join srcParentDir, srcImageFilename
+      srcImageFilenames.sort()
 
       spritesmith
         src: srcImageFilenames
