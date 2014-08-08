@@ -13,6 +13,7 @@ defOpts =
   destBase: ''
   imageFormat: 'png'
   withMixin: true
+  spritesmith: {}
 
 objectToSCSSMap = (obj) ->
   map = []
@@ -87,8 +88,7 @@ sprite = (opts = {}) ->
         join srcParentDir, srcImageFilename
       srcImageFilenames.sort()
 
-      spritesmith
-        src: srcImageFilenames
+      spritesmith merge(clone(opts.spritesmith), src: srcImageFilenames)
       , (err, result) =>
         throw new PluginError err if err?
 
