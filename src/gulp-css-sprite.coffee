@@ -7,6 +7,13 @@ spritesmith = require 'spritesmith'
 
 PLUGIN_NAME = 'gulp-css-cache-bust'
 
+EXTNAMES = [
+  '.png'
+  '.jpg'
+  '.jpeg'
+  '.gif'
+]
+
 defOpts =
   cssFormat: 'css'
   srcBase: 'sprite'
@@ -84,7 +91,7 @@ sprite = (opts = {}) ->
       spriteMap[group] = true
 
       srcParentDir = relative '', dirname file.path
-      srcImageFilenames = for srcImageFilename in readdirSync srcParentDir
+      srcImageFilenames = for srcImageFilename in readdirSync srcParentDir when extname(srcImageFilename).toLowerCase() in EXTNAMES
         join srcParentDir, srcImageFilename
       srcImageFilenames.sort()
 
