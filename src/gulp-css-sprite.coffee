@@ -90,7 +90,7 @@ sprite = (opts = {}) ->
 
       spritesmith merge(clone(opts.spritesmith), src: srcImageFilenames)
       , (err, result) =>
-        throw new PluginError err if err?
+        throw new PluginError PLUGIN_NAME, err if err?
 
         { coordinates, properties: { width: imageWidth, height: imageHeight }, image } = result
 
@@ -113,7 +113,7 @@ sprite = (opts = {}) ->
 
         callback()
 
-    throw new PluginError 'Stream is not supported' if file.isStream()
+    throw new PluginError PLUGIN_NAME, 'Stream is not supported' if file.isStream()
   , (callback) ->
     @push new File
       path: "_sprite.#{opts.cssFormat}"
