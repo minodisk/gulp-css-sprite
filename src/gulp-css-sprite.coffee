@@ -1,6 +1,6 @@
 through = require 'through2'
 { PluginError, File } = require 'gulp-util'
-{ dirname, basename, extname, relative, join } = require 'path'
+{ dirname, basename, extname, relative, join, resolve } = require 'path'
 { readdirSync } = require 'fs'
 { isObject, isNumber, isString, clone, merge } = require 'lodash'
 spritesmith = require 'spritesmith'
@@ -32,39 +32,34 @@ objectToSCSSMap = (obj) ->
         val = "#{val}px"
     else if isString val
       val = "'#{val}'"
-    map.push "#{key}: #{val}"
+    map.push "'#{key}': #{val}"
   "(#{map.join ', '})"
 
 mixin = (cssFormat) ->
   switch cssFormat
     when 'scss'
       """
-      @mixin sprite($group, $name) {
-        $group-data: map-get($sprite-map, $group);
-        $sprite-data: map-get($group-data, $name);
-        width: map-get($sprite-data, 'width');
-        height: map-get($sprite-data, 'height');
-        background: url(map-get($group-data, 'url')) no-repeat;
-        background-position: map-get($sprite-data, 'x') map-get($sprite-data, 'y');
+      @mixin sprite($filepath) {
+        $image-map: map-get($sprite-map, $filepath);
+        width: map-get($image-map, 'width');
+        height: map-get($image-map, 'height');
+        background: url(map-get($image-map, 'url')) no-repeat;
+        background-position: map-get($image-map, 'x') map-get($image-map, 'y');
       }
-      @mixin sprite-retina($group, $name) {
-        $group-data: map-get($sprite-map, $group);
-        $sprite-data: map-get($group-data, $name);
-        width: map-get($sprite-data, 'width')/2;
-        height: map-get($sprite-data, 'height')/2;
-        background: url(map-get($group-data, 'url')) no-repeat;
-        background-position: map-get($sprite-data, 'x')/2 map-get($sprite-data, 'y')/2;
-        -webkit-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
-        -moz-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
-        -o-background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
-        background-size: map-get($group-data, 'imageWidth')/2 map-get($group-data, 'imageHeight')/2;
+      @mixin sprite-retina($filepath) {
+        $image-map: map-get($sprite-map, $filepath);
+        width: map-get($image-map, 'width')/2;
+        height: map-get($image-map, 'height')/2;
+        background: url(map-get($image-map, 'url')) no-repeat;
+        background-position: map-get($image-map, 'x')/2 map-get($image-map, 'y')/2;
+        -webkit-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
+        -moz-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
+        -o-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
+        background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
       }
       """
     else
       ""
-
-getGroup = (filename) ->
-  dirname(filename).split('/').pop()
 
 getName = (filename) ->
   basename filename, extname filename
@@ -73,7 +68,11 @@ sprite = (opts = {}) ->
   opts = merge clone(defOpts), opts
 
   files = []
+  doneGroups = []
   spriteMap = {}
+
+  getGroup = (filename) ->
+    relative opts.srcBase, dirname filename
 
   through
     objectMode: true
@@ -84,11 +83,14 @@ sprite = (opts = {}) ->
       return
 
     if file.isBuffer()
-      group = getGroup file.path
-      if spriteMap[group]
+      # group = getGroup relative '', file.path
+      # group = getGroup file.path
+
+      group = dirname file.path
+      if doneGroups.indexOf(group) isnt -1
         callback()
         return
-      spriteMap[group] = true
+      doneGroups.push group
 
       srcParentDir = relative '', dirname file.path
       srcImageFilenames = for srcImageFilename in readdirSync srcParentDir when extname(srcImageFilename).toLowerCase() in EXTNAMES
@@ -102,6 +104,7 @@ sprite = (opts = {}) ->
         { coordinates, properties: { width: imageWidth, height: imageHeight }, image } = result
 
         relativeFilenameFromBase = relative opts.srcBase, "#{srcParentDir}.#{opts.imageFormat}"
+
         imageFile = new File
         imageFile.path = relativeFilenameFromBase
         imageFile.contents = new Buffer image, 'binary'
@@ -112,11 +115,13 @@ sprite = (opts = {}) ->
         #   basename pathFromProjectRoot
         # else
         url = "/#{relativeFilenameFromBase}"
-        spriteMap[group] = { imageWidth, imageHeight, url }
+        # spriteMap[group] = { imageWidth, imageHeight, url }
         for filename, { x, y, width, height } of coordinates
-          group = getGroup filename
-          name = getName filename
-          spriteMap[group][name] = { x: -x, y: -y, width, height }
+          # group = getGroup filename
+          # name = getName filename
+          # spriteMap[group][name] = { x: -x, y: -y, width, height }
+          relativeFilename = relative opts.srcBase, filename
+          spriteMap[relativeFilename] = { x: -x, y: -y, width, height, imageWidth, imageHeight, url }
 
         callback()
 

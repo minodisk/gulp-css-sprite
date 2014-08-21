@@ -1,23 +1,33 @@
-# expect = require 'expect'
-# sprite = require '../lib/gulp-css-sprite'
-# { File } = require 'gulp-util'
-# { PassThrough } = require 'stream'
-# es = require 'event-stream'
-# { clone } = require 'cloneextend'
-# { resolve } = require 'path'
-#
-# describe 'gulp-css-sprite', ->
-#
-#   describe 'in buffer mode', ->
-#
-#     it "should create css", (done) ->
-#       stream = sprite()
-#       stream.on 'data', (file) ->
-#         console.log file
-#       stream.on 'end', ->
-#         console.log 'end'
-#         done()
-#       stream.write new File path: resolve 'fixtures/sprites/images/circle/blue.png'
-#       stream.write new File path: resolve 'fixtures/sprites/images/circle/green.png'
-#       stream.write new File path: resolve 'fixtures/sprites/images/circle/red.png'
-#       stream.end()
+expect = require 'expect'
+sprite = require '../lib/gulp-css-sprite'
+{ File } = require 'gulp-util'
+{ PassThrough } = require 'stream'
+{ resolve, join, extname } = require 'path'
+{ readFileSync } = require 'fs'
+
+
+createFile = (path) ->
+  path = join __dirname, './fixtures', path
+  new File
+    path: path
+    contents: readFileSync path
+
+
+describe 'gulp-css-sprite', ->
+
+  describe 'in buffer mode', ->
+
+    it "should create css", (done) ->
+      stream = sprite srcBase: resolve __dirname, 'fixtures/sprite'
+      stream.on 'data', (file) ->
+        switch extname file.path
+          when '.png'
+            console.log file
+          when '.css'
+            console.log file.contents.toString()
+      stream.on 'end', ->
+        done()
+      stream.write createFile 'sprite/images/circle/blue.png'
+      stream.write createFile 'sprite/images/circle/green.png'
+      stream.write createFile 'sprite/images/circle/red.png'
+      stream.end()
