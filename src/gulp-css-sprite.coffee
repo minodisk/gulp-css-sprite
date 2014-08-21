@@ -39,23 +39,21 @@ mixin = (cssFormat) ->
   switch cssFormat
     when 'scss'
       """
-      @mixin sprite($filepath) {
+      @mixin sprite($filepath, $scale: 1) {
         $image-map: map-get($sprite-map, $filepath);
-        width: map-get($image-map, 'width');
-        height: map-get($image-map, 'height');
+        width: map-get($image-map, 'width') * $scale;
+        height: map-get($image-map, 'height') * $scale;
         background: url(map-get($image-map, 'url')) no-repeat;
-        background-position: map-get($image-map, 'x') map-get($image-map, 'y');
+        background-position: map-get($image-map, 'x') * $scale map-get($image-map, 'y') * $scale;
+        @if $scale != 1 {
+          -webkit-background-size: map-get($image-map, 'imageWidth') * $scale map-get($image-map, 'imageHeight') * $scale;
+          -moz-background-size: map-get($image-map, 'imageWidth') * $scale map-get($image-map, 'imageHeight') * $scale;
+          -o-background-size: map-get($image-map, 'imageWidth') * $scale map-get($image-map, 'imageHeight') * $scale;
+          background-size: map-get($image-map, 'imageWidth') * $scale map-get($image-map, 'imageHeight') * $scale;
+        }
       }
       @mixin sprite-retina($filepath) {
-        $image-map: map-get($sprite-map, $filepath);
-        width: map-get($image-map, 'width')/2;
-        height: map-get($image-map, 'height')/2;
-        background: url(map-get($image-map, 'url')) no-repeat;
-        background-position: map-get($image-map, 'x')/2 map-get($image-map, 'y')/2;
-        -webkit-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
-        -moz-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
-        -o-background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
-        background-size: map-get($image-map, 'imageWidth')/2 map-get($image-map, 'imageHeight')/2;
+        @include sprite($filepath, 0.5)
       }
       """
     else
