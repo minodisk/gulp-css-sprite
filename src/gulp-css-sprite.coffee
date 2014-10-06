@@ -5,22 +5,30 @@ through = require 'through2'
 { isObject, isNumber, isString, clone, merge } = require 'lodash'
 spritesmith = require 'spritesmith'
 
-PLUGIN_NAME = 'gulp-css-cache-bust'
-
+PLUGIN_NAME = 'gulp-css-sprite'
 EXTNAMES = [
   '.png'
   '.jpg'
   '.jpeg'
   '.gif'
 ]
+CSS_EXT_MAP =
+  'stylus': '.styl'
+  'scss': '.scss'
+
+log = (task, action, path) ->
+    gutil.log "#{ gutil.colors.cyan(task) }: [#{ gutil.colors.blue(action) }] #{ gutil.colors.magenta(path) }"
 
 defOpts =
-  cssFormat: 'css'
+  cssFormat: 'stylus'
   srcBase: 'sprite'
   destBase: ''
   imageFormat: 'png'
   withMixin: true
   spritesmith: {}
+
+objectToStylusHash = (obj) ->
+  JSON.stringify obj, null, 2
 
 objectToSCSSMap = (obj) ->
   map = []
@@ -37,6 +45,20 @@ objectToSCSSMap = (obj) ->
 
 mixin = (cssFormat) ->
   switch cssFormat
+    when 'stylus'
+      """
+      sprite(filepath, scale = 1)
+        image-hash = sprite-hash[filepath]
+        width: (image-hash.width * scale)px
+        height: (image-hash.height * scale)px
+        url = image-hash.url
+        background: url(url) no-repeat
+        background-position: (image-hash.x * scale)px (image-hash.y * scale)px
+        if scale != 1
+          background-size: (image-hash.imageWidth * scale)px, (image-hash.imageHeight * scale)px
+      sprite-retina(filepath)
+        sprite filepath, 0.5
+      """
     when 'scss'
       """
       @mixin sprite($filepath, $scale: 1) {
@@ -68,6 +90,11 @@ sprite = (opts = {}) ->
   files = []
   doneGroups = []
   spriteMap = {}
+  objectToHash = switch opts.cssFormat
+    when 'stylus'
+      (data) -> "sprite-hash = #{objectToStylusHash data}"
+    when 'scss'
+      (data) -> "$sprite-map: #{objectToSCSSMap data}"
 
   getGroup = (filename) ->
     relative opts.srcBase, dirname filename
@@ -126,9 +153,9 @@ sprite = (opts = {}) ->
     throw new PluginError PLUGIN_NAME, 'Stream is not supported' if file.isStream()
   , (callback) ->
     @push new File
-      path: "_sprite.#{opts.cssFormat}"
+      path: "sprite#{CSS_EXT_MAP[opts.cssFormat]}"
       contents: new Buffer """
-      $sprite-map: #{objectToSCSSMap spriteMap};
+      #{objectToHash spriteMap};
       #{mixin opts.cssFormat}
 
       """
