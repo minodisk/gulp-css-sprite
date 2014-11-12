@@ -46,8 +46,10 @@ $sprite-map: ('images/circle/blue.png': ('x': 0, 'y': 0, 'width': 32px, 'height'
 }
 
 """
-      stream.once 'end', ->
-        done()
+      count = 0
+      stream.on 'end', ->
+        if ++count is 2
+          done()
       stream.write createFile 'sprite/images/circle/blue.png'
       stream.write createFile 'sprite/images/circle/green.png'
       stream.write createFile 'sprite/images/circle/red.png'
@@ -62,6 +64,7 @@ $sprite-map: ('images/circle/blue.png': ('x': 0, 'y': 0, 'width': 32px, 'height'
           when '.png'
             file.relative.should.equal 'images/circle.png'
           when '.stylus'
+            console.log file.contents.toString()
             file.contents.toString().should.equal """
 sprite-hash = {
   'images/circle/blue.png': {
@@ -103,7 +106,6 @@ sprite-retina(filepath)
 
             """
       stream.once 'end', ->
-        console.log 'end---------'
         done()
       stream.write createFile 'sprite/images/circle/blue.png'
       stream.write createFile 'sprite/images/circle/green.png'

@@ -26,7 +26,9 @@ gulp.task 'mocha', ->
   gulp
     .src files.test, read: false
     .pipe coffee bare: true
-    .pipe mocha reporter: 'tap'
+    .pipe mocha
+      reporter: 'tap'
+      timeout: 10000
 
 gulp.task 'default', [
   'watch'
